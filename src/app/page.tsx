@@ -1,12 +1,23 @@
-import { MadeWithDyad } from "@/components/made-with-dyad";
+import { useNavigate } from "react-router-dom";  
+import { supabase } from "@/lib/supabase";  
+import { auth } from "@supabase/auth-helpers-react";  
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-1 items-center sm:items-start">
-        <h1>Blank page</h1>
-      </main>
-      <MadeWithDyad />
-    </div>
-  );
+export default function HomePage() {  
+  const navigate = useNavigate();  
+  const { error, status } = supabase.auth.getUser();  
+
+  if (status === 200 && session.user) {  
+    navigate("/home");  
+  }  
+
+  return (  
+    <div className="min-h-screen p-8 text-center">  
+      <h1 className="text-3xl font-bold mb-8">Bem-vindo ao Meu To Do!</h1>  
+      <p>Faça login ou cadastre-se para acessar a lista de tarefas.</p>  
+      <div className="flex justify-center space-x-4 mt-8">  
+        <a href="/login" className="text-blue-600 hover:text-blue-800">Login</a>  
+        <a href="/signup" className="text-blue-600 hover:text-blue-800">Cadastro</a>  
+      </div>  
+    </div>  
+  );  
 }
