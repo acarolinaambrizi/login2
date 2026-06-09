@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CheckCircle, Circle, ArrowRight } from "lucide-react";
 
 export default function HomePage() {
@@ -26,10 +26,7 @@ export default function HomePage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -37,24 +34,23 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center py-16">
-          <h1 className="text-5xl font-bold text-gray-800 mb-6">
-            Meu To Do
+        {/* Hero */}
+        <section className="text-center py-16">
+          <h1 className="text-5xl font-bold text-gray-800 mb-4">
+            Organize sua vida com Meu To Do
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Organize suas tarefas diárias de forma simples e visual. 
-            Cadastre-se e comece a gerenciar suas atividades agora!
+            Crie tarefas, marque-as como concluídas e mantenha sua produtividade em dia.
           </p>
-          
-          <div className="flex justify-center space-x-4 mb-12">
-            <Button 
+          <div className="flex justify-center gap-4">
+            <Button
               onClick={() => router.push("/auth/signup")}
               size="lg"
               className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
             >
               Criar Conta
             </Button>
-            <Button 
+            <Button
               onClick={() => router.push("/auth/signin")}
               variant="outline"
               size="lg"
@@ -63,9 +59,10 @@ export default function HomePage() {
               Entrar
             </Button>
           </div>
-        </div>
+        </section>
 
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
+        {/* Recursos */}
+        <section className="grid md:grid-cols-3 gap-8 mb-16">
           <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
@@ -101,23 +98,24 @@ export default function HomePage() {
               </CardDescription>
             </CardHeader>
           </Card>
-        </div>
+        </section>
 
-        <div className="text-center py-12">
+        {/* CTA final */}
+        <section className="text-center py-12">
           <h2 className="text-3xl font-bold text-gray-800 mb-4">
             Pronto para começar?
           </h2>
           <p className="text-gray-600 mb-8">
             Junte-se a milhares de usuários que já organizam suas vidas com Meu To Do.
           </p>
-          <Button 
+          <Button
             onClick={() => router.push("/auth/signup")}
             size="lg"
             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
           >
             Comece Agora
           </Button>
-        </div>
+        </section>
       </div>
     </div>
   );
