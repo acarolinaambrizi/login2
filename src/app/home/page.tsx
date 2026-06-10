@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, Circle, Plus, Filter, X } from "lucide-react";
+import { CheckCircle, Circle, Plus, X } from "lucide-react";
 
 interface Task {
   id: string;
@@ -62,7 +62,7 @@ export default function Home() {
 
   // Adicionar tarefa
   const addTask = async () => {
-    if (!newTask.title.trim()) return;
+    if (!newTask.title.trim() || !user) return;
     const { data, error } = await supabase
       .from("tasks")
       .insert({
@@ -195,7 +195,10 @@ export default function Home() {
             <Card key={task.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-4">
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center space-x-3">
-                  <button onClick={() => toggleTask(task.id, !task.completed)} className="focus:outline-none">
+                  <button
+                    onClick={() => toggleTask(task.id, !task.completed)}
+                    className="focus:outline-none"
+                  >
                     {task.completed ? (
                       <CheckCircle className="h-6 w-6 text-green-500" />
                     ) : (
