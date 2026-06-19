@@ -101,9 +101,9 @@ export default function Profile() {
                 </AvatarFallback>
               )}
             </Avatar>
-            <CardTitle className="text-2xl">{fullName}</CardTitle>
-            {profile.email && (
-              <p className="text-sm text-gray-600">{profile.email}</p>
+            <CardTitle className="text-2xl">{profile.email}</CardTitle>
+            {fullName !== profile.email && (
+              <p className="text-sm text-gray-600">{fullName}</p>
             )}
             {profile.created_at && (
               <p className="flex items-center text-xs text-gray-500">
