@@ -88,44 +88,49 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-2xl mx-auto">
-        <Card className="bg-white shadow-lg">
-          <CardHeader className="flex flex-col items-center space-y-4 pt-6">
-            <Avatar className="h-24 w-24 border-2 border-indigo-200">
+        <Card className="bg-white shadow-xl">
+          <CardHeader className="flex flex-col items-center space-y-5 pt-8">
+            <Avatar className="h-28 w-28 border-3 border-indigo-200 shadow-md">
               {profile.avatar_url ? (
                 <AvatarImage src={profile.avatar_url} alt={fullName} />
               ) : (
-                <AvatarFallback className="text-3xl bg-indigo-100 text-indigo-600">
+                <AvatarFallback className="text-4xl font-semibold bg-indigo-100 text-indigo-700">
                   {fullName.charAt(0).toUpperCase() || "U"}
                 </AvatarFallback>
               )}
             </Avatar>
-            <CardTitle className="text-2xl">{profile.email}</CardTitle>
+            <CardTitle className="text-3xl font-bold text-center">{profile.email}</CardTitle>
             {fullName !== profile.email && (
-              <p className="text-sm text-gray-600">{fullName}</p>
+              <p className="text-lg text-gray-700 font-medium">{fullName}</p>
             )}
             {profile.created_at && (
-              <p className="flex items-center text-xs text-gray-500">
-                <Calendar className="h-4 w-4 mr-1" />
+              <p className="flex items-center text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
+                <Calendar className="h-4 w-4 mr-2" />
                 Criado em {new Date(profile.created_at).toLocaleDateString("pt-BR")}
               </p>
             )}
           </CardHeader>
 
-          <CardContent className="space-y-4 px-6 py-4">
-            <p className="text-gray-700">
-              <strong>Tarefas criadas:</strong> {stats.total}
-            </p>
-            <p className="text-green-600">
-              <strong>Concluídas:</strong> {stats.completed}
-            </p>
-            <p className="text-yellow-600">
-              <strong>Pendentes:</strong> {stats.pending}
-            </p>
+          <CardContent className="space-y-5 px-8 py-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <p className="text-sm text-gray-600 mb-1">Tarefas criadas</p>
+                <p className="text-2xl font-bold text-blue-700">{stats.total}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                <p className="text-sm text-gray-600 mb-1">Concluídas</p>
+                <p className="text-2xl font-bold text-green-700">{stats.completed}</p>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                <p className="text-sm text-gray-600 mb-1">Pendentes</p>
+                <p className="text-2xl font-bold text-yellow-700">{stats.pending}</p>
+              </div>
+            </div>
           </CardContent>
 
-          <CardFooter className="bg-slate-50 text-center py-3">
+          <CardFooter className="bg-gray-50 text-center py-4">
             <p className="text-xs text-gray-500">
               Dados atualizados em tempo real.
             </p>
