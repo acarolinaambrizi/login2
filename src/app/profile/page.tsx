@@ -14,6 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Edit, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Stats {
   total: number;
@@ -34,6 +44,10 @@ export default function Profile() {
   const [stats, setStats] = useState<Stats>({ total: 0, completed: 0, pending: 0 });
   const [profile, setProfile] = useState<ProfileData>({});
   const [loading, setLoading] = useState(true);
+  const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -69,6 +83,10 @@ export default function Profile() {
         toast.error(profileError.message);
       } else {
         setProfile(profileData ?? {});
+        // Initialize edit fields with current profile data
+        setEditFirstName(profileData?.first_name ?? "");
+        setEditLastName(profileData?.last_name ?? "");
+        setEditEmail(profileData?.email ?? "");
       }
 
       setLoading(false);
@@ -76,6 +94,39 @@ export default function Profile() {
 
     void load();
   }, [router]);
+
+  const handleUpdateProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          first_name: editFirstName,
+          last_name: editLastName,
+          email: editEmail,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", session.user.id);
+
+      if (error) throw error;
+
+      // Update local profile state
+      setProfile({
+        first_name: editFirstName,
+        last_name: editLastName,
+        avatar_url: profile.avatar_url,
+        email: editEmail,
+        created_at: profile.created_at,
+      });
+
+      toast.success("Perfil atualizado com sucesso!");
+      setIsProfileEditOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao atualizar perfil");
+    }
+  };
 
   if (loading) {
     return (
@@ -114,7 +165,7 @@ export default function Profile() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push("/profile/edit")}
+              onClick={() => setIsProfileEditOpen(true)}
               className="mt-2"
             >
               <Edit className="h-4 w-4 mr-1" />
@@ -141,6 +192,68 @@ export default function Profile() {
           </CardFooter>
         </Card>
       </div>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={isProfileEditOpen} onOpenChange={setIsProfileEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Perfil</DialogTitle>
+            <DialogDescription>
+              Atualize suas informações de perfil abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(e) => {
+            e.preventDefault();
+            handleUpdateProfile();
+          }}>
+            <div className="space-y-2">
+              <Label htmlFor="edit-first-name">Nome</Label>
+              <Input
+                id="edit-first-name"
+                value={editFirstName}
+                onChange={(e) => setEditFirstName(e.target.value)}
+                placeholder="Digite seu nome"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-last-name">Sobrenome</Label>
+              <Input
+                id="edit-last-name"
+                value={editLastName}
+                onChange={(e) => setEditLastName(e.target.value)}
+                placeholder="Digite seu sobrenome"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">E-mail</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="seu@email.com"
+                required
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsProfileEditOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
