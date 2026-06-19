@@ -58,14 +58,17 @@ export default function Profile() {
 
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("first_name, last_name, avatar_url, email, created_at")
+        .select("first_name, last_name, avatar_url, created_at")
         .eq("id", session.user.id)
         .single();
 
       if (profileError) {
         toast.error(profileError.message);
       } else {
-        setProfile(profileData ?? {});
+        setProfile({
+          ...profileData,
+          email: session.user.email ?? "",
+        });
       }
 
       setLoading(false);
