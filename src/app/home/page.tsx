@@ -33,6 +33,7 @@ import {
   Loader2,
   Pencil,
   PlusCircle,
+  Search,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,13 @@ const formatDate = (date: string) => {
   }).format(new Date(date));
 };
 
+const normalizeText = (value: string) => {
+  return value
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+};
+
 export default function Home() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
@@ -74,6 +82,7 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [filter, setFilter] = useState<TaskFilter>("all");
+  const [search, setSearch] = useState("");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -127,12 +136,26 @@ export default function Home() {
   }, [tasks]);
 
   const visibleTasks = useMemo(() => {
-    return tasks.filter((task) => {
-      if (filter === "open") return !task.completed;
-      if (filter === "completed") return task.completed;
-      return true;
-    });
-  }, [tasks, filter]);
+    const normalizedSearch = normalizeText(search.trim());
+
+    return tasks
+      .filter((task) => {
+        if (filter === "open") return !task.completed;
+        if (filter === "completed") return task.completed;
+        return true;
+      })
+      .filter((task) => {
+        if (!normalizedSearch) return true;
+
+        const searchableText = normalizeText(
+          `${task.title} ${task.description ?? ""}`
+        );
+
+        return searchableText.includes(normalizedSearch);
+      });
+  }, [tasks, filter, search]);
+
+  const hasActiveSearch = search.trim().length > 0;
 
   const updateTask = useCallback(
     async (id: string, updates: TaskUpdate) => {
@@ -282,15 +305,17 @@ export default function Home() {
     toast.success("Tarefa removida.");
   };
 
-  const emptyTitle =
-    filter === "completed"
+  const emptyTitle = hasActiveSearch
+    ? "Nenhuma tarefa encontrada"
+    : filter === "completed"
       ? "Nenhuma tarefa concluída ainda"
       : filter === "open"
         ? "Tudo pendente por aqui"
         : "Sua lista está vazia";
 
-  const emptyDescription =
-    filter === "completed"
+  const emptyDescription = hasActiveSearch
+    ? "Tente buscar por outro termo ou limpe a busca para ver todas as tarefas."
+    : filter === "completed"
       ? "Conclua uma tarefa para vê-la nesta aba."
       : filter === "open"
         ? "Adicione uma nova tarefa para começar seu dia com foco."
@@ -392,12 +417,36 @@ export default function Home() {
       </div>
 
       <Card className="border border-white/70 bg-white shadow-sm">
-        <CardHeader className="flex flex-col gap-3 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Lista de tarefas</CardTitle>
-            <CardDescription>
-              Use o botão de lápis para editar e atualizar qualquer tarefa.
-            </CardDescription>
+        <CardHeader className="flex flex-col gap-4 border-b px-4 py-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-4">
+            <div>
+              <CardTitle>Lista de tarefas</CardTitle>
+              <CardDescription>
+                Use o botão de lápis para editar e atualizar qualquer tarefa.
+              </CardDescription>
+            </div>
+
+            <div className="grid gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar por título ou descrição..."
+                  className="pl-9"
+                  type="search"
+                  disabled={loading}
+                />
+              </div>
+
+              {hasActiveSearch && (
+                <p className="-mt-1 text-xs text-slate-500">
+                  {visibleTasks.length}{" "}
+                  {visibleTasks.length === 1 ? "resultado" : "resultados"}{" "}
+                  encontrado{visibleTasks.length === 1 ? "" : "s"}.
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
