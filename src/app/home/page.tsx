@@ -1,1 +1,627 @@
-"CardContent className="flex items-center justify-between p-4"> <div className="flex items-center space-x-3"> <button onClick={() => toggleTask(task.id)} className="text-gray-500 hover:text-gray-700"> {task.completed ? <CheckCircle className="h-6 w-6 text-green-500" /> : <Circle className="h-6 w-6 text-gray-400" />} </button> <div className="flex items-center space-x-3"> <h3 className={`font-semibold ${task.completed ? "line-through text-gray-500" : "text-gray-800"}`}> {task.title} </h3> {task.description && <p className={`text-sm ${task.completed ? "text-gray-400" : "text-gray-600"}`}>{task.description}</p>} </div> </div> <div className="flex items-center space-x-2"> <button onClick={() => setEditTask(task)} className="text-blue-600 hover:text-blue-800"> ✎ </button> <button onClick={() => deleteTask(task.id)} className="text-red-500 hover:text-red-700"> <X className="h-5 w-5" /> </button> </div> </CardContent>
+"use client";
+
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Calendar,
+  CheckCircle2,
+  Circle,
+  ListTodo,
+  Loader2,
+  Pencil,
+  PlusCircle,
+  Trash2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+
+type Task = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type TaskFilter = "all" | "open" | "completed";
+type TaskUpdate = Partial<Pick<Task, "title" | "description" | "completed">>;
+
+const filters: { id: TaskFilter; label: string }[] = [
+  { id: "all", label: "Todas" },
+  { id: "open", label: "Pendentes" },
+  { id: "completed", label: "Concluídas" },
+];
+
+const formatDate = (date: string) => {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(date));
+};
+
+export default function Home() {
+  const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [filter, setFilter] = useState<TaskFilter>("all");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const loadTasks = useCallback(async (currentUserId: string) => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", currentUserId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+      return;
+    }
+
+    setTasks(data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!active) return;
+
+      if (!session?.user) {
+        router.replace("/auth/signin");
+        return;
+      }
+
+      setUserId(session.user.id);
+      void loadTasks(session.user.id);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [loadTasks, router]);
+
+  const stats = useMemo(() => {
+    const completed = tasks.filter((task) => task.completed).length;
+
+    return {
+      total: tasks.length,
+      completed,
+      pending: tasks.length - completed,
+    };
+  }, [tasks]);
+
+  const visibleTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (filter === "open") return !task.completed;
+      if (filter === "completed") return task.completed;
+      return true;
+    });
+  }, [tasks, filter]);
+
+  const updateTask = useCallback(
+    async (id: string, updates: TaskUpdate) => {
+      if (!userId) {
+        toast.error("Faça login novamente.");
+        return null;
+      }
+
+      setSaving(true);
+
+      const { data, error } = await supabase
+        .from("tasks")
+        .update(updates)
+        .eq("id", id)
+        .eq("user_id", userId)
+        .select()
+        .single();
+
+      if (error) {
+        toast.error(error.message);
+        setSaving(false);
+        return null;
+      }
+
+      if (data) {
+        setTasks((current) =>
+          current.map((task) =>
+            task.id === id
+              ? {
+                  ...task,
+                  ...data,
+                  updated_at: data.updated_at,
+                }
+              : task
+          )
+        );
+      }
+
+      setSaving(false);
+      return data;
+    },
+    [userId]
+  );
+
+  const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (saving || !userId) return;
+
+    const nextTitle = title.trim();
+    const nextDescription = description.trim() || null;
+
+    if (!nextTitle) {
+      toast.error("Digite um título para a tarefa.");
+      return;
+    }
+
+    setSaving(true);
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert({
+        user_id: userId,
+        title: nextTitle,
+        description: nextDescription,
+        completed: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error(error.message);
+      setSaving(false);
+      return;
+    }
+
+    if (data) {
+      setTasks((current) => [data, ...current]);
+    }
+
+    setTitle("");
+    setDescription("");
+    setSaving(false);
+    toast.success("Tarefa criada.");
+  };
+
+  const toggleTask = async (task: Task) => {
+    const nextCompleted = !task.completed;
+    const updated = await updateTask(task.id, { completed: nextCompleted });
+
+    if (updated) {
+      toast.success(nextCompleted ? "Tarefa concluída." : "Tarefa reaberta.");
+    }
+  };
+
+  const openEditTask = (task: Task) => {
+    setEditingTask(task);
+    setTitle(task.title);
+    setDescription(task.description ?? "");
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (saving || !editingTask) return;
+
+    const nextTitle = title.trim();
+    const nextDescription = description.trim() || null;
+
+    if (!nextTitle) {
+      toast.error("Digite um título para a tarefa.");
+      return;
+    }
+
+    const updated = await updateTask(editingTask.id, {
+      title: nextTitle,
+      description: nextDescription,
+    });
+
+    if (!updated) return;
+
+    setIsEditOpen(false);
+    setEditingTask(null);
+    toast.success("Tarefa atualizada.");
+  };
+
+  const deleteTask = async (id: string) => {
+    if (saving || !userId) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      toast.error(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setTasks((current) => current.filter((task) => task.id !== id));
+    setSaving(false);
+    toast.success("Tarefa removida.");
+  };
+
+  const emptyTitle =
+    filter === "completed"
+      ? "Nenhuma tarefa concluída ainda"
+      : filter === "open"
+        ? "Tudo pendente por aqui"
+        : "Sua lista está vazia";
+
+  const emptyDescription =
+    filter === "completed"
+      ? "Conclua uma tarefa para vê-la nesta aba."
+      : filter === "open"
+        ? "Adicione uma nova tarefa para começar seu dia com foco."
+        : "Use o formulário acima para criar sua primeira tarefa.";
+
+  return (
+    <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+        <Card className="overflow-hidden border border-indigo-100 bg-white shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-indigo-600 p-3 text-white shadow-md">
+                <ListTodo className="h-7 w-7" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">Meu To Do</CardTitle>
+                <CardDescription>
+                  Crie, conclua e atualize suas tarefas em um só lugar.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-orange-50 p-4">
+                <p className="text-sm font-medium text-orange-700">Total</p>
+                <p className="mt-1 text-3xl font-bold text-orange-950">{stats.total}</p>
+              </div>
+              <div className="rounded-2xl bg-lime-50 p-4">
+                <p className="text-sm font-medium text-lime-700">Concluídas</p>
+                <p className="mt-1 text-3xl font-bold text-lime-950">{stats.completed}</p>
+              </div>
+              <div className="rounded-2xl bg-indigo-50 p-4">
+                <p className="text-sm font-medium text-indigo-700">Pendentes</p>
+                <p className="mt-1 text-3xl font-bold text-indigo-950">{stats.pending}</p>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="border-t bg-slate-50 px-6 py-4 text-sm text-slate-600">
+            Suas tarefas ficam salvas automaticamente na sua conta.
+          </CardFooter>
+        </Card>
+
+        <Card className="border border-white/70 bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle>Nova tarefa</CardTitle>
+            <CardDescription>
+              Adicione um título e, se quiser, uma descrição curta.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreateTask} className="grid gap-4">
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Título</Label>
+                    <Input
+                      id="title"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      placeholder="Ex.: Comprar mantimentos"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Descrição</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      placeholder="Detalhes opcionais"
+                      className="min-h-[44px] resize-none"
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full bg-indigo-600 px-6 hover:bg-indigo-700 sm:w-auto"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Adicionar
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border border-white/70 bg-white shadow-sm">
+        <CardHeader className="flex flex-col gap-3 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Lista de tarefas</CardTitle>
+            <CardDescription>
+              Use o botão de lápis para editar e atualizar qualquer tarefa.
+            </CardDescription>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {filters.map((item) => (
+              <Button
+                key={item.id}
+                type="button"
+                variant={filter === item.id ? "outline" : "outline"}
+                onClick={() => setFilter(item.id)}
+                className={cn(
+                  "border-slate-200",
+                  filter === item.id &&
+                    "border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700"
+                )}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-4 sm:p-6">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="rounded-2xl border p-4">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-2/3" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : visibleTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-slate-50 p-8 text-center">
+              <div className="mb-4 rounded-full bg-white p-4 shadow-sm">
+                <ListTodo className="h-8 w-8 text-indigo-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900">{emptyTitle}</h3>
+              <p className="mt-1 max-w-sm text-sm text-slate-600">{emptyDescription}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {visibleTasks.map((task) => (
+                <article
+                  key={task.id}
+                  className={cn(
+                    "rounded-2xl border p-4 transition hover:border-indigo-200 hover:shadow-sm",
+                    task.completed && "bg-slate-50"
+                  )}
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-1 items-start gap-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void toggleTask(task)}
+                        disabled={saving}
+                        className={cn(
+                          "rounded-full",
+                          task.completed
+                            ? "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                            : "text-slate-400 hover:bg-indigo-50 hover:text-indigo-700"
+                        )}
+                        aria-label={
+                          task.completed ? "Marcar como pendente" : "Marcar como concluída"
+                        }
+                      >
+                        {task.completed ? (
+                          <CheckCircle2 className="h-5 w-5" />
+                        ) : (
+                          <Circle className="h-5 w-5" />
+                        )}
+                      </Button>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3
+                            className={cn(
+                              "text-base font-semibold leading-6 text-slate-900",
+                              task.completed && "line-through text-slate-500"
+                            )}
+                          >
+                            {task.title}
+                          </h3>
+                          <Badge
+                            className={cn(
+                              "border-0",
+                              task.completed
+                                ? "bg-lime-100 text-lime-800"
+                                : "bg-orange-100 text-orange-800"
+                            )}
+                          >
+                            {task.completed ? "Concluída" : "Pendente"}
+                          </Badge>
+                        </div>
+
+                        {task.description && (
+                          <p
+                            className={cn(
+                              "mt-1 text-sm",
+                              task.completed ? "line-through text-slate-500" : "text-slate-600"
+                            )}
+                          >
+                            {task.description}
+                          </p>
+                        )}
+
+                        <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                          <Calendar className="h-3.5 w-3.5" />
+                          Criada em {formatDate(task.created_at)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditTask(task)}
+                        disabled={saving}
+                        className="text-slate-500 hover:bg-indigo-50 hover:text-indigo-700"
+                        aria-label={`Editar ${task.title}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void deleteTask(task.id)}
+                        disabled={saving}
+                        className="text-red-500 hover:bg-red-50 hover:text-red-700"
+                        aria-label={`Excluir ${task.title}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={isEditOpen}
+        onOpenChange={(open) => {
+          setIsEditOpen(open);
+
+          if (!open) {
+            setEditingTask(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <form onSubmit={handleSaveEdit}>
+            <DialogHeader>
+              <div className="mb-2 rounded-2xl bg-indigo-100 p-3 text-indigo-700">
+                <Pencil className="h-6 w-6" />
+              </div>
+              <DialogTitle>Atualizar tarefa</DialogTitle>
+              <DialogDescription>
+                Edite o título e a descrição. As mudanças serão salvas na sua lista.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Título</Label>
+                <Input
+                  id="edit-title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  disabled={saving}
+                  placeholder="Título da tarefa"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Descrição</Label>
+                <Textarea
+                  id="edit-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  disabled={saving}
+                  placeholder="Descrição opcional"
+                  className="min-h-[96px] resize-none"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+                disabled={saving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar alterações"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
