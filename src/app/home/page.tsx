@@ -47,13 +47,10 @@ type Task = {
   completed: boolean;
   created_at: string;
   updated_at: string;
-  due_date: string | null; // novo campo
 };
 
 type TaskFilter = "all" | "open" | "completed";
-type TaskUpdate = Partial<
-  Pick<Task, "title" | "description" | "completed" | "due_date">
->;
+type TaskUpdate = Partial<Pick<Task, "title" | "description" | "completed">>;
 
 const filters: { id: TaskFilter; label: string }[] = [
   { id: "all", label: "Todas" },
@@ -84,7 +81,6 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState<string>(""); // novo estado
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [search, setSearch] = useState("");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -92,6 +88,7 @@ export default function Home() {
 
   const loadTasks = useCallback(async (currentUserId: string) => {
     setLoading(true);
+
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
@@ -110,22 +107,27 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!active) return;
+
       if (!session?.user) {
         router.replace("/auth/signin");
         return;
       }
+
       setUserId(session.user.id);
       void loadTasks(session.user.id);
     });
+
     return () => {
       active = false;
     };
   }, [loadTasks, router]);
 
   const stats = useMemo(() => {
-    const completed = tasks.filter((t) => t.completed).length;
+    const completed = tasks.filter((task) => task.completed).length;
+
     return {
       total: tasks.length,
       completed,
@@ -135,6 +137,7 @@ export default function Home() {
 
   const visibleTasks = useMemo(() => {
     const normalizedSearch = normalizeText(search.trim());
+
     return tasks
       .filter((task) => {
         if (filter === "open") return !task.completed;
@@ -143,10 +146,12 @@ export default function Home() {
       })
       .filter((task) => {
         if (!normalizedSearch) return true;
-        const searchable = normalizeText(
+
+        const searchableText = normalizeText(
           `${task.title} ${task.description ?? ""}`
         );
-        return searchable.includes(normalizedSearch);
+
+        return searchableText.includes(normalizedSearch);
       });
   }, [tasks, filter, search]);
 
@@ -158,7 +163,9 @@ export default function Home() {
         toast.error("Faça login novamente.");
         return null;
       }
+
       setSaving(true);
+
       const { data, error } = await supabase
         .from("tasks")
         .update(updates)
@@ -174,23 +181,32 @@ export default function Home() {
       }
 
       if (data) {
-        setTasks((cur) =>
-          cur.map((t) => (t.id === id ? { ...t, ...data } : t))
+        setTasks((current) =>
+          current.map((task) =>
+            task.id === id
+              ? {
+                  ...task,
+                  ...data,
+                  updated_at: data.updated_at,
+                }
+              : task
+          )
         );
       }
+
       setSaving(false);
       return data;
     },
     [userId]
   );
 
-  const handleCreateTask = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     if (saving || !userId) return;
 
     const nextTitle = title.trim();
     const nextDescription = description.trim() || null;
-    const nextDue = dueDate ? dueDate : null;
 
     if (!nextTitle) {
       toast.error("Digite um título para a tarefa.");
@@ -198,6 +214,7 @@ export default function Home() {
     }
 
     setSaving(true);
+
     const { data, error } = await supabase
       .from("tasks")
       .insert({
@@ -205,7 +222,6 @@ export default function Home() {
         title: nextTitle,
         description: nextDescription,
         completed: false,
-        due_date: nextDue,
       })
       .select()
       .single();
@@ -216,10 +232,12 @@ export default function Home() {
       return;
     }
 
-    if (data) setTasks((cur) => [data, ...cur]);
+    if (data) {
+      setTasks((current) => [data, ...current]);
+    }
+
     setTitle("");
     setDescription("");
-    setDueDate("");
     setSaving(false);
     toast.success("Tarefa criada.");
   };
@@ -227,6 +245,7 @@ export default function Home() {
   const toggleTask = async (task: Task) => {
     const nextCompleted = !task.completed;
     const updated = await updateTask(task.id, { completed: nextCompleted });
+
     if (updated) {
       toast.success(nextCompleted ? "Tarefa concluída." : "Tarefa reaberta.");
     }
@@ -236,17 +255,16 @@ export default function Home() {
     setEditingTask(task);
     setTitle(task.title);
     setDescription(task.description ?? "");
-    setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
     setIsEditOpen(true);
   };
 
-  const handleSaveEdit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSaveEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     if (saving || !editingTask) return;
 
     const nextTitle = title.trim();
     const nextDescription = description.trim() || null;
-    const nextDue = dueDate ? dueDate : null;
 
     if (!nextTitle) {
       toast.error("Digite um título para a tarefa.");
@@ -256,10 +274,10 @@ export default function Home() {
     const updated = await updateTask(editingTask.id, {
       title: nextTitle,
       description: nextDescription,
-      due_date: nextDue,
     });
 
     if (!updated) return;
+
     setIsEditOpen(false);
     setEditingTask(null);
     toast.success("Tarefa atualizada.");
@@ -267,18 +285,22 @@ export default function Home() {
 
   const deleteTask = async (id: string) => {
     if (saving || !userId) return;
+
     setSaving(true);
+
     const { error } = await supabase
       .from("tasks")
       .delete()
       .eq("id", id)
       .eq("user_id", userId);
+
     if (error) {
       toast.error(error.message);
       setSaving(false);
       return;
     }
-    setTasks((cur) => cur.filter((t) => t.id !== id));
+
+    setTasks((current) => current.filter((task) => task.id !== id));
     setSaving(false);
     toast.success("Tarefa removida.");
   };
@@ -286,28 +308,62 @@ export default function Home() {
   const emptyTitle = hasActiveSearch
     ? "Nenhuma tarefa encontrada"
     : filter === "completed"
-    ? "Nenhuma tarefa concluída ainda"
-    : filter === "open"
-    ? "Tudo pendente por aqui"
-    : "Sua lista está vazia";
+      ? "Nenhuma tarefa concluída ainda"
+      : filter === "open"
+        ? "Tudo pendente por aqui"
+        : "Sua lista está vazia";
 
   const emptyDescription = hasActiveSearch
     ? "Tente buscar por outro termo ou limpe a busca para ver todas as tarefas."
     : filter === "completed"
-    ? "Conclua uma tarefa para vê-la nesta aba."
-    : filter === "open"
-    ? "Adicione uma nova tarefa para começar seu dia com foco."
-    : "Use o formulário acima para criar sua primeira tarefa.";
+      ? "Conclua uma tarefa para vê-la nesta aba."
+      : filter === "open"
+        ? "Adicione uma nova tarefa para começar seu dia com foco."
+        : "Use o formulário acima para criar sua primeira tarefa.";
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-        {/* ... cards de resumo e criação permanecem iguais, só adicionamos campo de data na criação ... */}
+        <Card className="overflow-hidden border border-indigo-100 bg-white shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-indigo-600 p-3 text-white shadow-md">
+                <ListTodo className="h-7 w-7" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">Meu To Do</CardTitle>
+                <CardDescription>
+                  Crie, conclua e atualize suas tarefas em um só lugar.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-orange-50 p-4">
+                <p className="text-sm font-medium text-orange-700">Total</p>
+                <p className="mt-1 text-3xl font-bold text-orange-950">{stats.total}</p>
+              </div>
+              <div className="rounded-2xl bg-lime-50 p-4">
+                <p className="text-sm font-medium text-lime-700">Concluídas</p>
+                <p className="mt-1 text-3xl font-bold text-lime-950">{stats.completed}</p>
+              </div>
+              <div className="rounded-2xl bg-indigo-50 p-4">
+                <p className="text-sm font-medium text-indigo-700">Pendentes</p>
+                <p className="mt-1 text-3xl font-bold text-indigo-950">{stats.pending}</p>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="border-t bg-slate-50 px-6 py-4 text-sm text-slate-600">
+            Suas tarefas ficam salvas automaticamente na sua conta.
+          </CardFooter>
+        </Card>
+
         <Card className="border border-white/70 bg-white shadow-sm">
           <CardHeader>
             <CardTitle>Nova tarefa</CardTitle>
             <CardDescription>
-              Adicione um título, descrição opcional e um prazo (opcional).
+              Adicione um título e, se quiser, uma descrição curta.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -319,7 +375,7 @@ export default function Home() {
                     <Input
                       id="title"
                       value={title}
-                      onChange={(e) => setTitle(e.target.value)}
+                      onChange={(event) => setTitle(event.target.value)}
                       placeholder="Ex.: Comprar mantimentos"
                       disabled={saving}
                     />
@@ -329,19 +385,9 @@ export default function Home() {
                     <Textarea
                       id="description"
                       value={description}
-                      onChange={(e) => setDescription(e.target.value)}
+                      onChange={(event) => setDescription(event.target.value)}
                       placeholder="Detalhes opcionais"
                       className="min-h-[44px] resize-none"
-                      disabled={saving}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dueDate">Prazo</Label>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
                       disabled={saving}
                     />
                   </div>
@@ -385,7 +431,7 @@ export default function Home() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar por título ou descrição..."
                   className="pl-9"
                   type="search"
@@ -408,7 +454,7 @@ export default function Home() {
               <Button
                 key={item.id}
                 type="button"
-                variant={filter === item.id ? "outline" : "outline"}
+                variant="outline"
                 onClick={() => setFilter(item.id)}
                 className={cn(
                   "border-slate-200",
@@ -425,8 +471,8 @@ export default function Home() {
         <CardContent className="p-4 sm:p-6">
           {loading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="rounded-2xl border p-4">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="rounded-2xl border p-4">
                   <div className="flex items-center gap-3">
                     <Skeleton className="h-10 w-10 rounded-full" />
                     <div className="flex-1 space-y-2">
@@ -513,13 +559,6 @@ export default function Home() {
                           </p>
                         )}
 
-                        {task.due_date && (
-                          <p className="mt-1 text-sm text-amber-600">
-                            <Calendar className="inline h-4 w-4 mr-1" />
-                            Prazo: {formatDate(task.due_date)}
-                          </p>
-                        )}
-
                         <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
                           <Calendar className="h-3.5 w-3.5" />
                           Criada em {formatDate(task.created_at)}
@@ -563,6 +602,7 @@ export default function Home() {
         open={isEditOpen}
         onOpenChange={(open) => {
           setIsEditOpen(open);
+
           if (!open) {
             setEditingTask(null);
           }
@@ -576,7 +616,7 @@ export default function Home() {
               </div>
               <DialogTitle>Atualizar tarefa</DialogTitle>
               <DialogDescription>
-                Edite título, descrição e prazo.
+                Edite o título e a descrição. As mudanças serão salvas na sua lista.
               </DialogDescription>
             </DialogHeader>
 
@@ -586,7 +626,7 @@ export default function Home() {
                 <Input
                   id="edit-title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(event) => setTitle(event.target.value)}
                   disabled={saving}
                   placeholder="Título da tarefa"
                 />
@@ -596,20 +636,10 @@ export default function Home() {
                 <Textarea
                   id="edit-description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(event) => setDescription(event.target.value)}
                   disabled={saving}
                   placeholder="Descrição opcional"
                   className="min-h-[96px] resize-none"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-due">Prazo</Label>
-                <Input
-                  id="edit-due"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  disabled={saving}
                 />
               </div>
             </div>
