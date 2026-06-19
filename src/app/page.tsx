@@ -37,7 +37,7 @@ export default function Page() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
+        <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
           <Button
             onClick={() => router.push("/auth/signin")}
             variant="outline"
