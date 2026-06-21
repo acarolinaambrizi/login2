@@ -88,6 +88,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -239,6 +240,10 @@ export default function Home() {
     setDescription(task.description ?? "");
     setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
     setIsEditOpen(true);
+  };
+
+  const confirmSaveEdit = () => {
+    setIsSaveConfirmOpen(true);
   };
 
   const handleSaveEdit = async (e: FormEvent<HTMLFormElement>) => {
@@ -577,7 +582,7 @@ export default function Home() {
         }}
       >
         <DialogContent className="sm:max-w-lg">
-          <form onSubmit={handleSaveEdit}>
+          <form onSubmit={confirmSaveEdit}>
             <DialogHeader>
               <div className="mb-2 rounded-2xl bg-indigo-100 p-3 text-indigo-700">
                 <Pencil className="h-6 w-6" />
@@ -647,6 +652,50 @@ export default function Home() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isSaveConfirmOpen}
+        onOpenChange={(open) => {
+          setIsSaveConfirmOpen(open);
+          if (!open) {
+            setEditingTask(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar alterações</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja salvar as alterações na tarefa "{editingTask?.title}"?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsSaveConfirmOpen(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveEdit}
+              disabled={saving || !editingTask}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Sim, salvar"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
