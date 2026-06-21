@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -89,7 +88,6 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isEditConfirmOpen, setIsEditConfirmOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -235,17 +233,11 @@ export default function Home() {
     }
   };
 
-  const confirmEditTask = (task: Task) => {
+  const startEditingTask = (task: Task) => {
     setEditingTask(task);
-    setIsEditConfirmOpen(true);
-  };
-
-  const startEditingTask = () => {
-    if (!editingTask) return;
-    setTitle(editingTask.title);
-    setDescription(editingTask.description ?? "");
-    setDueDate(editingTask.due_date ? editingTask.due_date.split("T")[0] : "");
-    setIsEditConfirmOpen(false);
+    setTitle(task.title);
+    setDescription(task.description ?? "");
+    setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
     setIsEditOpen(true);
   };
 
@@ -545,7 +537,7 @@ export default function Home() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        onClick={() => confirmEditTask(task)}
+                        onClick={() => startEditingTask(task)}
                         disabled={saving}
                         className="text-slate-500 hover:bg-indigo-50 hover:text-indigo-700"
                         aria-label={`Editar ${task.title}`}
@@ -574,46 +566,6 @@ export default function Home() {
           )}
         </CardContent>
       </Card>
-
-      <Dialog
-        open={isEditConfirmOpen}
-        onOpenChange={(open) => {
-          setIsEditConfirmOpen(open);
-          if (!open) {
-            setEditingTask(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="mb-2 rounded-2xl bg-indigo-100 p-3 text-indigo-700">
-              <Pencil className="h-6 w-6" />
-            </div>
-            <DialogTitle>Editar tarefa?</DialogTitle>
-            <DialogDescription>
-              Confirme que deseja editar a tarefa "{editingTask?.title}".
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsEditConfirmOpen(false)}
-              disabled={saving}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={startEditingTask}
-              disabled={saving || !editingTask}
-              className="bg-indigo-600 hover:bg-indigo-700"
-            >
-              Sim, editar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={isEditOpen}
