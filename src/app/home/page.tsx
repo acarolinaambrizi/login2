@@ -242,12 +242,12 @@ export default function Home() {
     setIsEditOpen(true);
   };
 
-  const confirmSaveEdit = () => {
+  const confirmSaveEdit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsSaveConfirmOpen(true);
   };
 
-  const handleSaveEdit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSaveEdit = async () => {
     if (saving || !editingTask) return;
 
     const nextTitle = title.trim();
@@ -267,6 +267,7 @@ export default function Home() {
 
     if (!updated) return;
     setIsEditOpen(false);
+    setIsSaveConfirmOpen(false);
     setEditingTask(null);
     setTitle("");
     setDescription("");
